@@ -1,0 +1,170 @@
+/* ── Root ──────────────────────────────────────────────────────────────────── */
+.root-pane {
+    -fx-background-color: #F4F6F9;
+    -fx-font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+.header-pane {
+    -fx-background-color: #1F497D;
+}
+
+.header-title {
+    -fx-text-fill: white;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+.header-subtitle {
+    -fx-text-fill: #B8CBE4;
+    -fx-font-size: 12px;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+.footer-pane {
+    -fx-background-color: #EAECF0;
+    -fx-border-color: #D0D5DD transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* ── ScrollPane ─────────────────────────────────────────────────────────────── */
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-padding: 0;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* ── Labels ────────────────────────────────────────────────────────────────── */
+.field-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #344054;
+}
+
+.section-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1F497D;
+    -fx-padding: 8 0 0 0;
+}
+
+.hint-label {
+    -fx-font-size: 10px;
+    -fx-text-fill: #667085;
+}
+
+.status-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #555;
+}
+
+/* ── Input Fields ───────────────────────────────────────────────────────────── */
+.input-field {
+    -fx-background-color: white;
+    -fx-border-color: #D0D5DD;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 7 12 7 12;
+    -fx-font-size: 13px;
+    -fx-pref-height: 38px;
+}
+
+.input-field:focused {
+    -fx-border-color: #1F497D;
+    -fx-effect: dropshadow(gaussian, rgba(31,73,125,0.15), 5, 0, 0, 0);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+.primary-btn {
+    -fx-background-color: #1F497D;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 28 10 28;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+    -fx-pref-height: 42px;
+}
+
+.primary-btn:hover {
+    -fx-background-color: #163660;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 8, 0, 0, 2);
+}
+
+.primary-btn:disabled {
+    -fx-background-color: #93B4D6;
+    -fx-cursor: default;
+}
+
+.secondary-btn {
+    -fx-background-color: white;
+    -fx-text-fill: #1F497D;
+    -fx-border-color: #1F497D;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 7 16 7 16;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-pref-height: 38px;
+}
+
+.secondary-btn:hover {
+    -fx-background-color: #EBF1F8;
+}
+
+/* ── Settings Box ────────────────────────────────────────────────────────────── */
+.settings-box {
+    -fx-background-color: #EBF1F8;
+    -fx-border-color: #C5D5E8;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 14 16 16 16;
+}
+
+.settings-link {
+    -fx-text-fill: #1F497D;
+    -fx-font-size: 12px;
+    -fx-underline: false;
+    -fx-padding: 0;
+}
+
+.settings-link:hover {
+    -fx-text-fill: #163660;
+}
+
+/* ── Log Area ─────────────────────────────────────────────────────────────────── */
+.log-area {
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 11px;
+    -fx-control-inner-background: #1B1F2E;
+    -fx-text-fill: #CDD6F4;
+    -fx-border-color: #313244;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-min-height: 160px;
+}
+
+.log-area .content {
+    -fx-background-color: #1B1F2E;
+}
+
+/* ── Progress Bar ─────────────────────────────────────────────────────────────── */
+.progress {
+    -fx-accent: #1F497D;
+    -fx-pref-height: 5px;
+    -fx-background-color: transparent;
+}
+
+/* ── ComboBox ────────────────────────────────────────────────────────────────── */
+.combo-box {
+    -fx-background-color: white;
+    -fx-border-color: #D0D5DD;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-pref-height: 38px;
+    -fx-font-size: 13px;
+}

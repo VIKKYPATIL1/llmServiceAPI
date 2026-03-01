@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.bnpp.releasenotes.controller.MainController"
+      spacing="0" styleClass="root-pane">
+
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <VBox styleClass="header-pane" spacing="3">
+        <padding><Insets top="20" right="32" bottom="16" left="32"/></padding>
+        <Label text="Release Notes Generator" styleClass="header-title"/>
+        <Label text="MCP (JIRA)  →  LLM  →  PowerPoint" styleClass="header-subtitle"/>
+    </VBox>
+
+    <!-- ── Main Form ──────────────────────────────────────────────────── -->
+    <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" styleClass="scroll-pane">
+        <VBox spacing="14">
+            <padding><Insets top="20" right="32" bottom="10" left="32"/></padding>
+
+            <!-- Release Version -->
+            <VBox spacing="5">
+                <Label text="Fix Version / Release *" styleClass="field-label"/>
+                <TextField fx:id="releaseVersionField"
+                           promptText="e.g.  2026.02.0"
+                           styleClass="input-field"/>
+                <Label text="Used as the fixVersion in the JIRA JQL query" styleClass="hint-label"/>
+            </VBox>
+
+            <!-- Master Slide -->
+            <VBox spacing="5">
+                <Label text="Master Slide Template (.pptx)" styleClass="field-label"/>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <TextField fx:id="masterSlideField"
+                               promptText="Optional — select your branded .pptx template"
+                               styleClass="input-field" HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="browseMasterBtn" text="Browse…"
+                            onAction="#onBrowseMaster" styleClass="secondary-btn"/>
+                </HBox>
+            </VBox>
+
+            <!-- Settings toggle -->
+            <HBox alignment="CENTER_LEFT">
+                <Hyperlink text="⚙  API &amp; Connection Settings"
+                           onAction="#onToggleSettings" styleClass="settings-link"/>
+            </HBox>
+
+            <!-- Collapsible Settings Panel -->
+            <VBox fx:id="settingsPane" spacing="10" styleClass="settings-box">
+                <Label text="MCP Server (JSON-RPC 2.0)" styleClass="section-label"/>
+                <GridPane hgap="14" vgap="9">
+                    <columnConstraints>
+                        <ColumnConstraints minWidth="160" prefWidth="170"/>
+                        <ColumnConstraints hgrow="ALWAYS"/>
+                    </columnConstraints>
+
+                    <Label text="MCP Endpoint"     styleClass="field-label" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                    <TextField fx:id="mcpEndpointField" styleClass="input-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+
+                    <Label text="JIRA Project Key" styleClass="field-label" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                    <TextField fx:id="jiraProjectField" promptText="e.g. ATH"
+                               styleClass="input-field" GridPane.columnIndex="1" GridPane.rowIndex="1" maxWidth="160"/>
+
+                    <Label text="MCP API Key"      styleClass="field-label" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                    <PasswordField fx:id="mcpApiKeyField" styleClass="input-field" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                </GridPane>
+
+                <Label text="LLM (OpenAI-compatible)" styleClass="section-label"/>
+                <GridPane hgap="14" vgap="9">
+                    <columnConstraints>
+                        <ColumnConstraints minWidth="160" prefWidth="170"/>
+                        <ColumnConstraints hgrow="ALWAYS"/>
+                    </columnConstraints>
+
+                    <Label text="LLM Endpoint"  styleClass="field-label" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                    <TextField fx:id="llmEndpointField" styleClass="input-field" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+
+                    <Label text="LLM API Key"   styleClass="field-label" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                    <PasswordField fx:id="llmApiKeyField" styleClass="input-field" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+
+                    <Label text="Model"         styleClass="field-label" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                    <TextField fx:id="llmModelField" promptText="codestral-latest-ITG"
+                               styleClass="input-field" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                </GridPane>
+            </VBox>
+
+            <!-- Log output -->
+            <VBox spacing="5" VBox.vgrow="ALWAYS">
+                <Label text="Generation Log" styleClass="field-label"/>
+                <TextArea fx:id="logArea"
+                          promptText="Steps will be logged here as they run…"
+                          styleClass="log-area"
+                          wrapText="true"
+                          prefRowCount="8"
+                          VBox.vgrow="ALWAYS"/>
+            </VBox>
+        </VBox>
+    </ScrollPane>
+
+    <!-- ── Footer ─────────────────────────────────────────────────────── -->
+    <VBox spacing="8" styleClass="footer-pane">
+        <padding><Insets top="12" right="32" bottom="20" left="32"/></padding>
+        <ProgressBar fx:id="progressBar" maxWidth="Infinity" styleClass="progress"/>
+        <HBox alignment="CENTER_LEFT" spacing="16">
+            <Label fx:id="statusLabel" text="Ready" styleClass="status-label"
+                   HBox.hgrow="ALWAYS" wrapText="true"/>
+            <Button fx:id="generateBtn" text="Generate PPT  →"
+                    onAction="#onGenerate" styleClass="primary-btn" defaultButton="true"/>
+        </HBox>
+    </VBox>
+
+</VBox>
