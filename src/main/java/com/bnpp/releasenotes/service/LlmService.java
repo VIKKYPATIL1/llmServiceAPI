@@ -74,6 +74,17 @@ public class LlmService {
         return parseResponse(rawJson);
     }
 
+    public String generateFunctionalTestCasesCsv(String jiraTitle, String jiraDescription)
+            throws IOException {
+        if (jiraTitle == null || jiraTitle.isBlank()) {
+            throw new IOException("JIRA title is empty, unable to generate test cases.");
+        }
+
+        String userPrompt = buildFunctionalTestCasesPrompt(jiraTitle, jiraDescription);
+        String rawResponse = callLlmWithSystemPrompt(buildFunctionalCsvSystemPrompt(), userPrompt);
+        return sanitizeCsvOutput(rawResponse);
+    }
+
     // ── System Prompt ──────────────────────────────────────────────────────────
 
     private String buildSystemPrompt() {
@@ -136,6 +147,39 @@ public class LlmService {
             """;
     }
 
+    private String buildFunctionalCsvSystemPrompt() {
+        return """
+            You are a QA engineer.
+            Output must be STRICT CSV only. Do not add notes before or after CSV.
+
+            Required header row exactly:
+            "Test_Case_Number","Test_Case_Scenario","Input","Output","Description"
+
+            Rules:
+            - Generate comprehensive functional UI test scenarios and edge cases.
+            - Test number format: TC-01, TC-02, TC-03 ...
+            - Keep language concise but complete.
+            - Every field value in every row must be double-quoted.
+            - Do not output markdown, bullet points, or explanations.
+            """;
+    }
+
+    private String buildFunctionalTestCasesPrompt(String jiraTitle, String jiraDescription) {
+        String description = jiraDescription == null || jiraDescription.isBlank()
+                ? "No description provided."
+                : jiraDescription;
+
+        return """
+            Create functional UI test cases in CSV format.
+
+            Jira Title:
+            %s
+
+            Jira Description:
+            %s
+            """.formatted(cleanDescription(jiraTitle), cleanDescription(description));
+    }
+
     // ── User Prompt ────────────────────────────────────────────────────────────
 
     private String buildUserContent(String version, List<McpJiraIssue> issues) {
@@ -194,6 +238,10 @@ public class LlmService {
      * Calls the internal OpenAI-compatible endpoint exactly as seen in Image 2.
      */
     private String callLlm(String userContent) throws IOException {
+        return callLlmWithSystemPrompt(buildSystemPrompt(), userContent);
+    }
+
+    private String callLlmWithSystemPrompt(String systemPrompt, String userContent) throws IOException {
         // Build request body matching Image 2 exactly
         String bodyJson = mapper.writeValueAsString(
             mapper.createObjectNode()
@@ -204,7 +252,7 @@ public class LlmService {
                 .set("messages", mapper.createArrayNode()
                     .add(mapper.createObjectNode()
                         .put("role", "system")
-                        .put("content", buildSystemPrompt()))
+                        .put("content", systemPrompt))
                     .add(mapper.createObjectNode()
                         .put("role", "user")
                         .put("content", userContent)))
@@ -240,6 +288,20 @@ public class LlmService {
 
             return choices.get(0).path("message").path("content").asText();
         }
+    }
+
+    private String sanitizeCsvOutput(String raw) throws IOException {
+        String cleaned = raw == null ? "" : raw.trim();
+        if (cleaned.startsWith("```")) {
+            cleaned = cleaned.replaceAll("(?s)^```[a-zA-Z]*\\s*", "")
+                    .replaceAll("\\s*```$", "")
+                    .trim();
+        }
+
+        if (!cleaned.contains("Test_Case_Number")) {
+            throw new IOException("LLM did not return expected CSV header for functional test cases.");
+        }
+        return cleaned;
     }
 
     // ── Response Parsing ───────────────────────────────────────────────────────

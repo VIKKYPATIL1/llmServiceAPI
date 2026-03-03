@@ -168,3 +168,30 @@
     -fx-pref-height: 38px;
     -fx-font-size: 13px;
 }
+
+
+/* ── Tabs ───────────────────────────────────────────────────────────────────── */
+.main-tabs {
+    -fx-background-color: transparent;
+}
+
+.main-tabs .tab-header-area .tab-header-background {
+    -fx-background-color: #E6EBF2;
+}
+
+.main-tabs .tab {
+    -fx-background-color: #DCE4EF;
+    -fx-padding: 6 14 6 14;
+}
+
+.main-tabs .tab:selected {
+    -fx-background-color: white;
+}
+
+.tab-content-box {
+    -fx-background-color: white;
+    -fx-border-color: #D0D5DD;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 16;
+}
