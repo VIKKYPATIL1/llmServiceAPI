@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bnpp.releasenotes.model.AppConfig;
+import com.bnpp.releasenotes.model.McpJiraFunctionalDetails;
 import com.bnpp.releasenotes.model.McpJiraIssue;
 import okhttp3.*;
 
@@ -13,44 +14,15 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Fetches JIRA issues from the MCP server using JSON-RPC 2.0.
- *
- * ── Protocol (from Image 1) ───────────────────────────────────────────────────
- * POST https://devops.mcp.cib.echonet/jsonrpc
- * Body:
- * {
- *   "jsonrpc": "2.0",
- *   "id": "1",
- *   "method": "tools/call",
- *   "params": {
- *     "name": "search_jira_issues",
- *     "arguments": {
- *       "jql": "project = ATH and fixVersion = \"2026.02.0\"",
- *       "environment": "default",
- *       "extra_fields": ""
- *     }
- *   }
- * }
- *
- * ── Response Format (SSE) ─────────────────────────────────────────────────────
- * The response arrives as Server-Sent Events:
- *
- *   event: message
- *   data: {"jsonrpc":"2.0","id":"1","result":{"content":[{"type":"text","text":"[{...}]"}],"isError":false}}
- *
- * Parsing chain:
- *   1. Read raw response body
- *   2. Extract the "data: ..." line
- *   3. Parse outer JSON → result.content[0].text
- *   4. Parse the text value as a JSON array → List<McpJiraIssue>
  */
 public class JiraFetchService {
 
     private static final String JSONRPC_VERSION = "2.0";
-    private static final String REQUEST_ID      = "1";
-    private static final String METHOD          = "tools/call";
-    private static final String ENVIRONMENT     = "default";
+    private static final String REQUEST_ID = "1";
+    private static final String METHOD = "tools/call";
+    private static final String ENVIRONMENT = "default";
 
-    private final AppConfig    config;
+    private final AppConfig config;
     private final OkHttpClient http;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -58,20 +30,59 @@ public class JiraFetchService {
         this.config = config;
         this.http = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(120, TimeUnit.SECONDS)  // SSE can be slow
+                .readTimeout(120, TimeUnit.SECONDS)
                 .build();
     }
 
-    // ── Public ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Fetches all JIRA issues for the given fixVersion.
-     *
-     * @param fixVersion e.g. "2026.02.0"
-     * @return parsed list of JIRA issues
-     */
     public List<McpJiraIssue> fetchIssues(String fixVersion) throws IOException {
-        String requestBody = buildJsonRpcRequest(fixVersion);
+        JsonNode arguments = mapper.createObjectNode()
+                .put("jql", "project = " + config.getJiraProject() + " and fixVersion = \"" + fixVersion + "\"")
+                .put("environment", ENVIRONMENT)
+                .put("extra_fields", "");
+
+        String responseBody = callTool(config.getMcpToolName(), arguments);
+        return parseIssuesFromJsonRpcResponse(responseBody);
+    }
+
+    public McpJiraFunctionalDetails fetchIssueByReference(String jiraId) throws IOException {
+        JsonNode arguments = mapper.createObjectNode()
+                .put("jiraID", jiraId)
+                .put("environment", ENVIRONMENT)
+                .put("extra_fields", "");
+
+        String responseBody = callTool("get_jira_by_reference", arguments);
+        JsonNode payload = parsePayloadFromJsonRpcResponse(responseBody);
+
+        if (payload.isArray() && payload.size() > 0) {
+            return mapper.treeToValue(payload.get(0), McpJiraFunctionalDetails.class);
+        }
+        if (payload.isObject()) {
+            return mapper.treeToValue(payload, McpJiraFunctionalDetails.class);
+        }
+
+        throw new IOException("No JIRA issue returned for reference: " + jiraId);
+    }
+
+    public void addCommentToJira(String taskId, String commentMarkdown) throws IOException {
+        JsonNode arguments = mapper.createObjectNode()
+                .put("task_id", taskId)
+                .put("comment", commentMarkdown)
+                .put("environment", ENVIRONMENT);
+
+        String responseBody = callTool("add_jira_comment", arguments);
+        JsonNode root = mapper.readTree(extractDataJson(responseBody));
+        if (root.has("error")) {
+            throw new IOException("MCP JSON-RPC error while adding comment: " + root.get("error"));
+        }
+
+        JsonNode result = root.path("result");
+        if (result.path("isError").asBoolean(false)) {
+            throw new IOException("MCP add_jira_comment returned isError=true: " + result);
+        }
+    }
+
+    private String callTool(String toolName, JsonNode arguments) throws IOException {
+        String requestBody = buildJsonRpcRequest(toolName, arguments);
 
         Request request = new Request.Builder()
                 .url(config.getMcpEndpoint())
@@ -84,56 +95,63 @@ public class JiraFetchService {
         try (Response response = http.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String body = response.body() != null ? response.body().string() : "(empty)";
-                throw new IOException(
-                    "MCP server error HTTP " + response.code()
-                    + " for fixVersion='" + fixVersion + "': " + body);
+                throw new IOException("MCP server error HTTP " + response.code() + ": " + body);
             }
-
-            String rawBody = response.body().string();
-            return parseSseResponse(rawBody);
+            return response.body() != null ? response.body().string() : "";
         }
     }
 
-    // ── Request Builder ────────────────────────────────────────────────────────
-
-    /**
-     * Builds the JSON-RPC 2.0 request body exactly as seen in Image 1.
-     * Uses ObjectMapper to ensure all values are correctly JSON-escaped.
-     */
-    private String buildJsonRpcRequest(String fixVersion) throws IOException {
-        // Build the full request using ObjectMapper so all strings are properly escaped
-        String jql = "project = " + config.getJiraProject()
-                   + " and fixVersion = \"" + fixVersion + "\"";
-
+    private String buildJsonRpcRequest(String toolName, JsonNode arguments) throws IOException {
         return mapper.writeValueAsString(
-            mapper.createObjectNode()
-                .put("jsonrpc", JSONRPC_VERSION)
-                .put("id",      REQUEST_ID)
-                .put("method",  METHOD)
-                .set("params",  mapper.createObjectNode()
-                    .put("name", config.getMcpToolName())
-                    .set("arguments", mapper.createObjectNode()
-                        .put("jql",          jql)
-                        .put("environment",  ENVIRONMENT)
-                        .put("extra_fields", "")
-                    )
-                )
+                mapper.createObjectNode()
+                        .put("jsonrpc", JSONRPC_VERSION)
+                        .put("id", REQUEST_ID)
+                        .put("method", METHOD)
+                        .set("params", mapper.createObjectNode()
+                                .put("name", toolName)
+                                .set("arguments", arguments))
         );
     }
 
-    // ── SSE Response Parsing ───────────────────────────────────────────────────
+    private List<McpJiraIssue> parseIssuesFromJsonRpcResponse(String rawBody) throws IOException {
+        JsonNode payload = parsePayloadFromJsonRpcResponse(rawBody);
+        if (!payload.isArray()) {
+            throw new IOException("Expected issue list array but got: " + payload);
+        }
 
-    /**
-     * Parses the SSE response body.
-     *
-     * SSE format (each line is either "event: X" or "data: {...}"):
-     *   event: message
-     *   data: {"jsonrpc":"2.0","id":"1","result":{"content":[{"type":"text","text":"[{...}]"}],"isError":false}}
-     *
-     * We find the "data:" line and parse it.
-     */
-    private List<McpJiraIssue> parseSseResponse(String rawBody) throws IOException {
-        // Find the "data:" line in the SSE stream
+        List<McpJiraIssue> issues = mapper.readValue(payload.toString(), new TypeReference<>() {});
+        if (issues.isEmpty()) {
+            throw new IOException("No JIRA issues found. Check your fixVersion / JQL query.");
+        }
+        return issues;
+    }
+
+    private JsonNode parsePayloadFromJsonRpcResponse(String rawBody) throws IOException {
+        JsonNode root = mapper.readTree(extractDataJson(rawBody));
+
+        if (root.has("error")) {
+            throw new IOException("MCP JSON-RPC error: " + root.get("error"));
+        }
+
+        JsonNode result = root.path("result");
+        if (result.path("isError").asBoolean(false)) {
+            throw new IOException("MCP returned isError=true: " + result);
+        }
+
+        JsonNode content = result.path("content");
+        if (!content.isArray() || content.isEmpty()) {
+            throw new IOException("MCP response missing result.content. Full response: " + root);
+        }
+
+        String payloadText = content.get(0).path("text").asText();
+        if (payloadText == null || payloadText.isBlank()) {
+            throw new IOException("MCP result.content[0].text is empty.");
+        }
+
+        return mapper.readTree(payloadText);
+    }
+
+    private String extractDataJson(String rawBody) throws IOException {
         String dataJson = null;
         for (String line : rawBody.split("\n")) {
             String trimmed = line.trim();
@@ -143,7 +161,6 @@ public class JiraFetchService {
             }
         }
 
-        // If no SSE framing, the body might be plain JSON directly
         if (dataJson == null) {
             dataJson = rawBody.trim();
         }
@@ -151,59 +168,6 @@ public class JiraFetchService {
         if (dataJson.isEmpty()) {
             throw new IOException("Empty response from MCP server.");
         }
-
-        return parseJsonRpcResult(dataJson);
-    }
-
-    /**
-     * Drills into:
-     *   jsonRpcResponse → result → content[0] → text → (parse as JSON array)
-     */
-    private List<McpJiraIssue> parseJsonRpcResult(String dataJson) throws IOException {
-        JsonNode root = mapper.readTree(dataJson);
-
-        // Check for JSON-RPC level error
-        if (root.has("error")) {
-            JsonNode err = root.get("error");
-            throw new IOException("MCP JSON-RPC error: " + err.toString());
-        }
-
-        // Check isError flag inside result
-        JsonNode result = root.path("result");
-        if (result.path("isError").asBoolean(false)) {
-            throw new IOException("MCP returned isError=true: " + result.toString());
-        }
-
-        // Navigate: result → content → [0] → text
-        JsonNode content = result.path("content");
-        if (!content.isArray() || content.size() == 0) {
-            throw new IOException(
-                "MCP response missing 'result.content' array.\nFull response: " + dataJson);
-        }
-
-        String issuesJson = content.get(0).path("text").asText();
-        if (issuesJson.isBlank()) {
-            throw new IOException(
-                "MCP result.content[0].text is empty — no JIRA data returned.");
-        }
-
-        // The text value IS a JSON array string like "[{\"id\":...},{...}]"
-        try {
-            List<McpJiraIssue> issues = mapper.readValue(
-                issuesJson, new TypeReference<List<McpJiraIssue>>() {});
-
-            if (issues.isEmpty()) {
-                throw new IOException(
-                    "No JIRA issues found. Check your fixVersion / JQL query.");
-            }
-
-            return issues;
-
-        } catch (Exception e) {
-            throw new IOException(
-                "Failed to parse JIRA issues JSON from MCP text field.\n"
-                + "Content (first 500 chars): "
-                + issuesJson.substring(0, Math.min(500, issuesJson.length())), e);
-        }
+        return dataJson;
     }
 }
